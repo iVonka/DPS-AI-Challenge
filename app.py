@@ -1,10 +1,12 @@
 import pickle
 import boto3
 import os
+import pandas as pd
 
 from fastapi import FastAPI
-from pydantic import BaseModel
-#from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+
 
 #load_dotenv()
 
@@ -33,14 +35,16 @@ print(f"Model downloaded to {local_file_path}")
 with open('model.pkl', 'rb') as file:
     model = pickle.load(file)
 
+df = pd.read_csv('data_lagged.csv', parse_dates=['month_date'])
+
 # Define the API
 app = FastAPI()
 
 
 # Define the input schema
 class InputData(BaseModel):
-    year: int
-    month: int
+    year: int = Field(..., ge=2021, le=2022, description="Year should be between 2021 and 2022 (inclusive)")
+    month: int = Field(..., ge=1, le=12, description="Month should be between 1 and 12 (inclusive)")
 
 
 @app.post('/predict')
@@ -49,7 +53,9 @@ async def predict(data: InputData):
     year = data.year
     month = data.month
 
-    prediction = model.predict([[28, 23.08, -42.86, 35]])
+    data = df[(df['month_date'].dt.year == year) & (df['month_date'].dt.month == month)].iloc[0].tolist()
+
+    prediction = model.predict([[data[4], data[5], data[6], data[2]]])
 
     # Return the prediction
     return {'prediction': prediction[0]}
